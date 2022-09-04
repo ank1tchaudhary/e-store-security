@@ -7,6 +7,7 @@ import com.estoresecurity.exception.NoDataFoundException;
 import com.estoresecurity.model.CustomUserDetails;
 import com.estoresecurity.model.LoginRequest;
 import com.estoresecurity.model.LoginResponse;
+import com.estoresecurity.model.RefreshTokenResponse;
 import com.estoresecurity.repository.UserRepository;
 import com.estoresecurity.utility.JWTTokenUtility;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -47,16 +48,17 @@ public class AuthController {
         UsernamePasswordAuthenticationToken authenticationProvider = new UsernamePasswordAuthenticationToken(request.getUsername(), request.getPassword());
         try {
             Authentication authentication = authenticationManager.authenticate(authenticationProvider);
-//            CustomUserDetails user = (CustomUserDetails) authentication.getPrincipal();
+            CustomUserDetails user = (CustomUserDetails) authentication.getPrincipal();
             SecurityContextHolder.getContext().setAuthentication(authentication);
             Optional<User> dbUser = userRepository.findByUsername(request.getUsername());
             if(dbUser.isPresent()) {
                 dbUser.get().setLoggedIn(true);
                 User updatedUser = userRepository.save(dbUser.get());
 
-                String token = jwtTokenUtility.generateJWTToken(updatedUser);
+                String access_token = jwtTokenUtility.generateJWTToken(updatedUser);
+                String refresh_token = jwtTokenUtility.generateRefreshJWTToken(updatedUser);
 
-                LoginResponse response = LoginResponse.builder().username(updatedUser.getUsername()).roles(updatedUser.getRoles()).token(token).build();
+                LoginResponse response = LoginResponse.builder().username(updatedUser.getUsername()).roles(updatedUser.getRoles()).accessToken(access_token).refreshToken(refresh_token).build();
                 return ResponseEntity.ok().body(response);
             }else {
                 throw new NoDataFoundException("User does not exist in db.");
@@ -77,7 +79,6 @@ public class AuthController {
                 if (isTokenValidated) {
                     DecodedJWT decodedJWT = jwtTokenUtility.getDecodedJWT(token);
                     String username = decodedJWT.getSubject();
-                    boolean isUserLoggedIn = decodedJWT.getClaim("isUserLoggedIn").asBoolean();
                     Optional<User> user = userRepository.findByUsername(username);
                     if (user.isPresent()) {
                         user.get().setLoggedIn(false);
@@ -94,6 +95,35 @@ public class AuthController {
 
         }
         return ResponseEntity.badRequest().body("Header/Token missing");
+    }
+
+
+    @PostMapping("/refreshToken")
+    public ResponseEntity<RefreshTokenResponse> refreshToken(HttpServletRequest request, HttpServletResponse response) {
+        String authorizationHeader = request.getHeader(HttpHeaders.AUTHORIZATION);
+        if (authorizationHeader != null && authorizationHeader.startsWith("Bearer ")) {
+            try {
+                String token = authorizationHeader.substring("Bearer ".length());
+                boolean isTokenValidated = jwtTokenUtility.validateToken(token);
+                if (isTokenValidated) {
+                    DecodedJWT decodedJWT = jwtTokenUtility.getDecodedJWT(token);
+                    String username = decodedJWT.getSubject();
+                    Optional<User> user = userRepository.findByUsername(username);
+                    if (user.isPresent()) {
+                        String refreshToken = jwtTokenUtility.generateRefreshJWTTokenExtended(user.get());
+
+                        return ResponseEntity.ok().body(RefreshTokenResponse.builder().accessToken(refreshToken).build());
+                    }
+                } else {
+                    throw new RuntimeException("Invalid User");
+                }
+
+            } catch (RuntimeException e) {
+                throw new RuntimeException(e.getMessage());
+            }
+
+        }
+        return ResponseEntity.badRequest().build();
     }
 
 

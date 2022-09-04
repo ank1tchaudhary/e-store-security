@@ -6,7 +6,6 @@ import com.auth0.jwt.algorithms.Algorithm;
 import com.auth0.jwt.interfaces.DecodedJWT;
 import com.estoresecurity.domain.Role;
 import com.estoresecurity.domain.User;
-import io.jsonwebtoken.*;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
@@ -27,6 +26,12 @@ public class JWTTokenUtility {
     @Value("${app.jwt.expiration}")
     private Long jwtExpiration;
 
+    @Value("${app.jwt.refreshTimeout}")
+    private Long jwtRefreshTime;
+
+    @Value("${app.jwt.refreshExtendedTimeout}")
+    private Long jwtRefreshTokenExtended;
+
 
     public String generateJWTToken(User user) {
 
@@ -39,7 +44,36 @@ public class JWTTokenUtility {
                 .withExpiresAt(new Date(System.currentTimeMillis() + jwtExpiration))
                 .withIssuer(jwtIssuer)
                 .withClaim("roles", user.getRoles().stream().map(Role::getRoleName).collect(Collectors.toList()))
-                .withClaim("isUserLoggedIn", user.isLoggedIn())
+                .sign(algorithm);
+    }
+
+
+    public String generateRefreshJWTToken(User user) {
+
+        Algorithm algorithm = Algorithm.HMAC256(secret);
+
+        return JWT.create()
+                .withAudience("BackOfficeClientApp")
+                .withSubject(user.getUsername())
+                .withIssuedAt(new Date())
+                .withExpiresAt(new Date(System.currentTimeMillis() + jwtRefreshTime))
+                .withIssuer(jwtIssuer)
+                .withClaim("roles", user.getRoles().stream().map(Role::getRoleName).collect(Collectors.toList()))
+                .sign(algorithm);
+    }
+
+
+    public String generateRefreshJWTTokenExtended(User user) {
+
+        Algorithm algorithm = Algorithm.HMAC256(secret);
+
+        return JWT.create()
+                .withAudience("BackOfficeClientApp")
+                .withSubject(user.getUsername())
+                .withIssuedAt(new Date())
+                .withExpiresAt(new Date(System.currentTimeMillis() + jwtRefreshTokenExtended))
+                .withIssuer(jwtIssuer)
+                .withClaim("roles", user.getRoles().stream().map(Role::getRoleName).collect(Collectors.toList()))
                 .sign(algorithm);
     }
 
@@ -52,16 +86,8 @@ public class JWTTokenUtility {
             if (tokenIssuer.equals(jwtIssuer)) {
                 return true;
             }
-        } catch (ExpiredJwtException ex) {
-            log.error("JWT expired --> {}", ex.getMessage());
-        } catch (IllegalArgumentException ex) {
-            log.error("Token is null, empty or only whitespace --> {}", ex.getMessage());
-        } catch (MalformedJwtException ex) {
-            log.error("JWT is invalid --> {}", ex.getMessage());
-        } catch (UnsupportedJwtException ex) {
-            log.error("JWT is not supported --> {}", ex.getMessage());
-        } catch (SignatureException ex) {
-            log.error("Signature validation failed");
+        } catch (RuntimeException ex) {
+           throw new RuntimeException("Token is invalid");
         }
 
         return false;
@@ -79,18 +105,9 @@ public class JWTTokenUtility {
             } else {
                 return decodedJWT;
             }
-        } catch (ExpiredJwtException ex) {
-            log.error("JWT expired --> {}", ex.getMessage());
-        } catch (IllegalArgumentException ex) {
-            log.error("Token is null, empty or only whitespace --> {}", ex.getMessage());
-        } catch (MalformedJwtException ex) {
-            log.error("JWT is invalid --> {}", ex.getMessage());
-        } catch (UnsupportedJwtException ex) {
-            log.error("JWT is not supported --> {}", ex.getMessage());
-        } catch (SignatureException ex) {
-            log.error("Signature validation failed");
+        } catch (RuntimeException ex) {
+            throw new RuntimeException("Token is invalid");
         }
-        return null;
     }
 
 }
