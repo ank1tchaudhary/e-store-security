@@ -8,11 +8,11 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.security.authentication.AuthenticationManager;
-import org.springframework.security.authentication.dao.DaoAuthenticationProvider;
 import org.springframework.security.config.annotation.authentication.configuration.AuthenticationConfiguration;
 import org.springframework.security.config.annotation.method.configuration.EnableGlobalMethodSecurity;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
+import org.springframework.security.config.annotation.web.configuration.WebSecurityCustomizer;
 import org.springframework.security.config.core.GrantedAuthorityDefaults;
 import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
@@ -36,11 +36,14 @@ public class SecurityConfiguration{
     @Autowired
     private CustomAuthorizationFilter authorizationFilter;
 
+//    @Autowired
+//    private CustomAuthenticationProvider authenticationProvider;
+
     @Bean
     public SecurityFilterChain filterChain(HttpSecurity http) throws Exception{
         http.cors().disable();
         http.csrf().disable();
-        http.authorizeRequests().antMatchers("/auth/**").permitAll();
+        http.authorizeRequests().antMatchers("/auth/**","/api/save","/api/listUsers").permitAll();
         http.authorizeRequests().anyRequest().authenticated();
         http.sessionManagement().sessionCreationPolicy(SessionCreationPolicy.STATELESS);
         http.addFilterBefore(authorizationFilter, UsernamePasswordAuthenticationFilter.class);
@@ -53,22 +56,31 @@ public class SecurityConfiguration{
         return authenticationConfiguration.getAuthenticationManager();
     }
 
-    @Bean
-    public DaoAuthenticationProvider authenticationProvider(){
-        DaoAuthenticationProvider auth =new DaoAuthenticationProvider();
-        auth.setUserDetailsService(userDetailsService);
-        auth.setPasswordEncoder(passwordEncoder());
-        return auth;
-
-    }
-
 //    @Bean
-//    public WebSecurityCustomizer webSecurityCustomizer() {
-//        return (web) -> web.ignoring().antMatchers("/ignore1", "/ignore2");
+//    public DaoAuthenticationProvider authenticationProvider(){
+//        DaoAuthenticationProvider auth =new DaoAuthenticationProvider();
+//        auth.setUserDetailsService(userDetailsService);
+//        auth.setPasswordEncoder(passwordEncoder());
+//        return auth;
+//
 //    }
 
     @Bean
-    GrantedAuthorityDefaults grantedAuthorityDefaults() {
+    public WebSecurityCustomizer webSecurityCustomizer() {
+        return (web) ->  web.ignoring().antMatchers("/v2/api-docs",
+                               "/swagger-resources",
+                                "/swagger-resources/**",
+                                "/configuration/ui",
+                                "/configuration/security",
+                                "/swagger-ui.html",
+                                "/webjars/**",
+                                // -- Swagger UI v3 (OpenAPI)
+                                "/v3/api-docs/**",
+                               "/swagger-ui/**");
+    }
+
+    @Bean
+    public GrantedAuthorityDefaults grantedAuthorityDefaults() {
         return new GrantedAuthorityDefaults(""); // Remove the ROLE_ prefix
     }
 

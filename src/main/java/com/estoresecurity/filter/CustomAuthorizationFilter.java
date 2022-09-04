@@ -1,6 +1,7 @@
 package com.estoresecurity.filter;
 
 import com.auth0.jwt.interfaces.DecodedJWT;
+import com.estoresecurity.repository.UserRepository;
 import com.estoresecurity.utility.JWTTokenUtility;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpHeaders;
@@ -27,22 +28,31 @@ public class CustomAuthorizationFilter extends OncePerRequestFilter {
     @Autowired
     private JWTTokenUtility utility;
 
+    @Autowired
+    private UserRepository repository;
+
     @Override
     protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain filterChain) throws ServletException, IOException {
-        if (!hasAuthorizationBearer(request)) {
+        if(request.getServletPath().equals("/login") || request.getServletPath().equals("/token/refresh")){
+            filterChain.doFilter(request,response);
+        }else {
+
+
+            if (!hasAuthorizationBearer(request)) {
+                filterChain.doFilter(request, response);
+                return;
+            }
+
+            String token = getAccessToken(request);
+
+            if (!utility.validateToken(token)) {
+                filterChain.doFilter(request, response);
+                return;
+            }
+
+            setAuthenticationContext(token, request);
             filterChain.doFilter(request, response);
-            return;
         }
-
-        String token = getAccessToken(request);
-
-        if (!utility.validateToken(token)) {
-            filterChain.doFilter(request, response);
-            return;
-        }
-
-        setAuthenticationContext(token, request);
-        filterChain.doFilter(request, response);
     }
 
     private boolean hasAuthorizationBearer(HttpServletRequest request) {
@@ -61,8 +71,8 @@ public class CustomAuthorizationFilter extends OncePerRequestFilter {
     }
 
     private void setAuthenticationContext(String token, HttpServletRequest request) {
+        DecodedJWT decodedJWT = utility.getDecodedJWT(token);
 
-        DecodedJWT decodedJWT = utility.jwtVerifier().verify(token);
         String username= decodedJWT.getSubject();
         String[] roles = decodedJWT.getClaim("roles").asArray(String.class);
         Collection<SimpleGrantedAuthority> authorities = new ArrayList<>();
@@ -76,6 +86,7 @@ public class CustomAuthorizationFilter extends OncePerRequestFilter {
 
         SecurityContextHolder.getContext().setAuthentication(authentication);
     }
+
 
 
 

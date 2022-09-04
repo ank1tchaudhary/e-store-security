@@ -1,7 +1,6 @@
 package com.estoresecurity.service;
 
 import com.estoresecurity.domain.User;
-import com.estoresecurity.exception.NoDataFoundException;
 import com.estoresecurity.model.CustomUserDetails;
 import com.estoresecurity.repository.UserRepository;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -21,7 +20,7 @@ public class CustomUserDetailsService implements UserDetailsService {
     @Override
     public UserDetails loadUserByUsername(String username) throws UsernameNotFoundException {
         Optional<User> userFromDB = userRepository.findByUsername(username);
-        User user = userFromDB.orElseThrow(() -> new NoDataFoundException("User does not exist in db"));
-        return CustomUserDetails.builder().user(user).build();
+        User user = userFromDB.orElseThrow(() -> new UsernameNotFoundException("User does not exist in db"));
+        return new CustomUserDetails(user);
     }
 }

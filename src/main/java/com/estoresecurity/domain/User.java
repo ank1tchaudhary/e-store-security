@@ -26,6 +26,7 @@ public class User {
     private String username;
     private String password;
     private boolean isActive;
+    private boolean isLoggedIn;
 
     @OneToMany(cascade = CascadeType.ALL,fetch = FetchType.EAGER)
     @JoinColumn(name = "user_id")

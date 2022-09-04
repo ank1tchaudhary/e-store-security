@@ -28,19 +28,18 @@ public class JWTTokenUtility {
     private Long jwtExpiration;
 
 
+    public String generateJWTToken(User user) {
 
-
-    public String generateJWTToken(User user){
-
-        Algorithm algorithm=Algorithm.HMAC256(secret);
+        Algorithm algorithm = Algorithm.HMAC256(secret);
 
         return JWT.create()
                 .withAudience("BackOfficeClientApp")
                 .withSubject(user.getUsername())
                 .withIssuedAt(new Date())
-                .withExpiresAt(new Date(System.currentTimeMillis()+ jwtExpiration))
+                .withExpiresAt(new Date(System.currentTimeMillis() + jwtExpiration))
                 .withIssuer(jwtIssuer)
-                .withClaim("roles",user.getRoles().stream().map(Role::getRoleName).collect(Collectors.toList()))
+                .withClaim("roles", user.getRoles().stream().map(Role::getRoleName).collect(Collectors.toList()))
+                .withClaim("isUserLoggedIn", user.isLoggedIn())
                 .sign(algorithm);
     }
 
@@ -49,8 +48,8 @@ public class JWTTokenUtility {
             Algorithm algorithm = Algorithm.HMAC256(secret);
             JWTVerifier verifier = JWT.require(algorithm).build();
             DecodedJWT decodedJWT = verifier.verify(token);
-            String tokenIssuer=decodedJWT.getIssuer();
-            if(jwtIssuer.equals(tokenIssuer)){
+            String tokenIssuer = decodedJWT.getIssuer();
+            if (tokenIssuer.equals(jwtIssuer)) {
                 return true;
             }
         } catch (ExpiredJwtException ex) {
@@ -68,18 +67,30 @@ public class JWTTokenUtility {
         return false;
     }
 
-    public JWTVerifier jwtVerifier(){
-        Algorithm algorithm = Algorithm.HMAC256(secret);
-        return JWT.require(algorithm).build();
+
+    public DecodedJWT getDecodedJWT(String token) {
+        try {
+            Algorithm algorithm = Algorithm.HMAC256(secret);
+            JWTVerifier verifier = JWT.require(algorithm).build();
+            DecodedJWT decodedJWT = verifier.verify(token);
+            String tokenIssuer = decodedJWT.getIssuer();
+            if (!tokenIssuer.equals(jwtIssuer)) {
+                throw new RuntimeException("Invalid Token");
+            } else {
+                return decodedJWT;
+            }
+        } catch (ExpiredJwtException ex) {
+            log.error("JWT expired --> {}", ex.getMessage());
+        } catch (IllegalArgumentException ex) {
+            log.error("Token is null, empty or only whitespace --> {}", ex.getMessage());
+        } catch (MalformedJwtException ex) {
+            log.error("JWT is invalid --> {}", ex.getMessage());
+        } catch (UnsupportedJwtException ex) {
+            log.error("JWT is not supported --> {}", ex.getMessage());
+        } catch (SignatureException ex) {
+            log.error("Signature validation failed");
+        }
+        return null;
     }
-
-
-    public Claims getClaimsFromToken(String token) {
-        return Jwts.parser()
-                .setSigningKey(secret)
-                .parseClaimsJws(token)
-                .getBody();
-    }
-
 
 }
